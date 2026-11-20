@@ -156,7 +156,7 @@ function sprite(body,vb,res){
   return new Promise(r=>{
     const W=Math.ceil(vb[2]*res),H=Math.ceil(vb[3]*res),img=new Image();
     img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d').drawImage(img,0,0,W,H);r({c,vb})};
-    img.onerror=()=>r(null);
+    img.onerror=()=>r(null);setTimeout(()=>r(null),4000);
     img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb.join(' ')}" width="${W}" height="${H}">${body}</svg>`);
   });
 }
@@ -242,9 +242,10 @@ const ready=(async()=>{
   for(const k in TUL)jobs['t_'+k]=[tulipSvg(TUL[k]),[-24,-50,48,64],H];
   const keys=Object.keys(jobs),res=await Promise.all(keys.map(k=>sprite(...jobs[k])));
   keys.forEach((k,i)=>SP[k]=res[i]);
-  try{await Promise.all([document.fonts.load('700 20px "Dancing Script"'),document.fonts.load('700 12px Nunito')])}catch(e){}
-})();
-const ds=sp=>{if(sp)ctx.drawImage(sp.c,sp.vb[0],sp.vb[1],sp.vb[2],sp.vb[3])};
+  try{await Promise.race([Promise.all([document.fonts.load('700 20px "Dancing Script"'),document.fonts.load('700 12px Nunito')]),new Promise(r=>setTimeout(r,1500))])}catch(e){}
+})().catch(()=>{});
+const readyT=Promise.race([ready,new Promise(r=>setTimeout(r,5000))]);
+const ds=sp=>{if(sp&&sp.c.width)ctx.drawImage(sp.c,sp.vb[0],sp.vb[1],sp.vb[2],sp.vb[3])};
 
 /* ================= scene data ================= */
 const FL=[
@@ -265,7 +266,7 @@ const GY=[[58,218,-.5],[342,218,.5],[168,272,-.15],[234,274,.15],[204,118,0],[11
 let cw=0,ch=0;
 const cam={cx:200,cy:266,z:1},tgt={cx:200,cy:266,z:1};
 let path=null,pathT0=0,pathDone=null,wind=1,windT=1,tagA=0,tagV=0;
-const K=()=>Math.min(cw/400,ch/560);
+const K=()=>Math.max(.01,Math.min(cw/400,ch/560));
 function clampCam(o){const k=K(),hw=cw/(2*k*o.z),hh=ch/(2*k*o.z);
   o.cx=hw*2>=400?200:clamp(o.cx,hw,400-hw);o.cy=hh*2>=560?266:clamp(o.cy,hh,560-hh)}
 function resize(){
@@ -362,8 +363,7 @@ let last=performance.now();
 function frame(now){
   const dt=Math.min(50,now-last)/16.667;last=now;
   dropAcc+=dt;if(dropAcc>48&&!document.hidden){dropAcc=0;drop()}
-  if(mainOn){update(dt,now);if(!noteOpen)draw(now)}
-  stepFx(dt);
+  try{if(mainOn){update(dt,now);if(!noteOpen)draw(now)}stepFx(dt)}catch(err){}
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -378,7 +378,7 @@ setTimeout(type,700);
 intro.addEventListener('click',async()=>{
   audio();
   if(typing){clearTimeout(timer);$('#typed').textContent=TEXT;typing=false;$('#tapHint').classList.add('on');return}
-  if(going)return;going=true;await ready;chime();
+  if(going)return;going=true;try{await readyT}catch(e){}try{chime()}catch(e){}
   intro.classList.add('hide');main.classList.remove('hide');resize();t0=performance.now();mainOn=true;
   setTimeout(()=>flyIn(16),600);
 });
